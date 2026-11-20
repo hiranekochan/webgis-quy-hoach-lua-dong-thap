@@ -1,0 +1,7 @@
+{
+  "name": "webgis-dat-lua-dong-thap",
+  "private": true,
+  "dependencies": {
+    "maplibre-gl": "6.19.0"
+  }
+}

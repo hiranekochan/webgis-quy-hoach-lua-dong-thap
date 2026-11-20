@@ -1,0 +1,12 @@
+{
+  "name": "webgis-dong-thap-deploy",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pmtiles": "4.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "wrangler": "4.165.0"
+  }
+}

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="webgis-api-origin" content="">
+  <title>Xác định vùng quy hoạch trồng lúa năng suất, chất lượng cao trên địa bàn tỉnh Đồng Tháp</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/maplibre/maplibre-gl.css">
+  <link rel="stylesheet" href="/assets/app.css?v=20261119b">
+  <script type="module" src="/assets/app.js?v=20261119b"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <img class="brand-mark" src="/assets/logo.png" width="62" height="50" alt="Sub-NIAPP">
+      <div class="brand-text">
+        <p>TỈNH ĐỒNG THÁP · HỆ THỐNG THÔNG TIN ĐỊA LÝ</p>
+        <h1>Xác định vùng quy hoạch trồng lúa năng suất, chất lượng cao trên địa bàn tỉnh Đồng Tháp</h1>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="map-area" aria-label="Bản đồ đất lúa Đồng Tháp">
+      <div id="map"></div>
+
+      <div class="map-top">
+        <div class="map-actions">
+          <button id="controls-toggle" type="button" aria-controls="layers-panel" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 12 12 17 22 12"/>
+              <polyline points="2 17 12 22 22 17"/>
+            </svg>
+            <span>Lớp bản đồ</span>
+          </button>
+          <button id="search-toggle" type="button" aria-controls="search-form" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span>Tìm kiếm</span>
+          </button>
+        </div>
+        <div id="notice" class="notice" role="status">Đang mở dữ liệu bản đồ…</div>
+      </div>
+
+      <aside id="controls" class="controls" aria-label="Điều khiển bản đồ" hidden>
+        <div id="layers-panel" hidden>
+          <section class="layer-controls" aria-labelledby="layer-title">
+            <div class="section-heading">
+              <div class="heading-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                  <polyline points="2 12 12 17 22 12"/>
+                  <polyline points="2 17 12 22 22 17"/>
+                </svg>
+                <h2 id="layer-title">Lớp bản đồ</h2>
+              </div>
+              <button class="panel-close" type="button" aria-label="Đóng bảng lớp" title="Đóng">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div id="layer-list"></div>
+          </section>
+
+          <section class="settings">
+            <label for="basemap">Bản đồ nền</label>
+            <select id="basemap">
+              <option value="google">Bản đồ đường</option>
+              <option value="imagery">Bản đồ vệ tinh</option>
+              <option value="none">Nền trống</option>
+            </select>
+            <label class="opacity" for="opacity">
+              <span>Độ trong suốt</span>
+              <output id="opacity-value">25%</output>
+            </label>
+            <input type="range" min="0" max="90" value="25" id="opacity">
+          </section>
+        </div>
+
+        <form id="search-form" class="search-form" hidden>
+          <div class="section-heading">
+            <div class="heading-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <label for="query">Tìm trên bản đồ</label>
+            </div>
+            <button class="panel-close" type="button" aria-label="Đóng bảng tìm kiếm" title="Đóng">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <div class="search-row">
+            <input id="query" maxlength="100" type="search" placeholder="Tên xã, mã ô bao, #ID, tọa độ…" required>
+            <button class="search-submit" type="submit">Tìm</button>
+          </div>
+          <select id="search-layer" aria-label="Lớp cần tìm">
+            <option value="">Tìm trong tất cả các lớp</option>
+          </select>
+          <div id="results" class="results" aria-live="polite" hidden></div>
+        </form>
+      </aside>
+
+      <div class="map-tools" aria-label="Công cụ bản đồ">
+        <button id="fit" type="button" title="Về toàn tỉnh" aria-label="Về toàn tỉnh">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/>
+          </svg>
+          <span>Toàn tỉnh</span>
+        </button>
+        <button id="measure-length" type="button" aria-pressed="false" title="Đo khoảng cách">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.3 8.7L8.7 21.3c-.9.9-2.4.9-3.3 0l-2.7-2.7c-.9-.9-.9-2.4 0-3.3L15.3 2.7c.9-.9 2.4-.9 3.3 0l2.7 2.7c.9.9.9 2.4 0 3.3z"/>
+            <line x1="14.5" y1="6.5" x2="17" y2="9"/><line x1="11.5" y1="9.5" x2="13.5" y2="11.5"/><line x1="8.5" y1="12.5" x2="11" y2="15"/>
+          </svg>
+          <span>Đo dài</span>
+        </button>
+        <button id="measure-area" type="button" aria-pressed="false" title="Đo diện tích">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="4 6 14 3 20 11 15 20 5 17 4 6"/>
+            <circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="3" r="1.5" fill="currentColor"/>
+            <circle cx="20" cy="11" r="1.5" fill="currentColor"/><circle cx="15" cy="20" r="1.5" fill="currentColor"/>
+            <circle cx="5" cy="17" r="1.5" fill="currentColor"/>
+          </svg>
+          <span>Đo vùng</span>
+        </button>
+      </div>
+
+      <div id="measurement" class="measurement" hidden>
+        <span class="measurement-dot" aria-hidden="true"></span>
+        <span id="measurement-text"></span>
+        <button id="finish" type="button">Xong</button>
+        <button id="clear" type="button">Xóa</button>
+      </div>
+
+      <aside id="detail" class="detail" aria-labelledby="detail-title" hidden>
+        <div class="detail-heading">
+          <div class="detail-heading-info">
+            <div class="detail-meta">
+              <p>ĐỐI TƯỢNG TRÊN BẢN ĐỒ</p>
+              <span id="detail-badge" class="detail-badge" hidden></span>
+            </div>
+            <h2 id="detail-title" tabindex="-1">Thông tin</h2>
+          </div>
+          <div class="detail-heading-actions">
+            <button id="detail-zoom" type="button" title="Phóng tới đối tượng" aria-label="Phóng tới đối tượng" hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+              </svg>
+            </button>
+            <button id="detail-close" type="button" aria-label="Đóng thông tin" title="Đóng">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="choices" class="choices" hidden></div>
+        <div id="detail-body" class="detail-body" aria-live="polite"></div>
+      </aside>
+
+      <footer class="map-status">
+        <span id="coordinates"></span>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

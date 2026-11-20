@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- Prevent hotlink blocking from ImgBB CDN -->
+  <meta name="referrer" content="no-referrer" />
+  <title>Bản đồ Thổ nhưỡng Nông hóa xã An Cư, Tịnh Biên, An Giang</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+  <!-- Leaflet and Plugins -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
+  <script src="https://unpkg.com/shpjs@3.6.2/dist/shp.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+  <style>
+    :root {
+      --parcel-label-size: 8px;
+      --pd-label-size: 4px;
+    }
+
+    html, body {
+      height: 100vh; width: 100vw;
+      font-family: 'Roboto', Arial, sans-serif;
+      overflow: hidden;
+      margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #map { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 1; }
+
+    /* --- MAP LABELS STYLES --- */
+    .parcel-label-icon, .pd-label-icon {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    .parcel-map-label {
+      font-family: Arial, sans-serif;
+      font-size: var(--parcel-label-size);
+      font-weight: 700;
+      color: #dc2626; /* Nhãn màu đỏ */
+      /* Halo màu vàng */
+      text-shadow: -1px -1px 0 #ffff00, 1px -1px 0 #ffff00, -1px 1px 0 #ffff00, 1px 1px 0 #ffff00, 0 0 2px #ffff00;
+      white-space: nowrap;
+      pointer-events: none;
+      text-align: center;
+      line-height: 1;
+      display: inline-block;
+      transform: translate(-50%, -50%);
+    }
+
+    .pd-map-label {
+      font-family: Arial, sans-serif;
+      font-size: var(--pd-label-size);
+      font-weight: 700;
+      color: #000000; /* Nhãn màu đen */
+      text-shadow: none; /* Không để halo */
+      white-space: nowrap;
+      pointer-events: none;
+      margin-left: 6px;
+      margin-top: -3px;
+      line-height: 1;
+      display: inline-block;
+    }
+
+    /* --- MAIN CONTROLS --- */
+    .top-left-controls {
+      position: absolute; left: 12px; top: 12px; z-index: 2000;
+      display: flex; flex-direction: column; gap: 8px;
+      pointer-events: none;
+    }
+    .square-btn {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.95);
+      border: none; border-radius: 6px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      color: #444; font-size: 16px;
+      cursor: pointer; pointer-events: auto;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+    .square-btn:hover, .square-btn:active { background: #f0f0f0; color: #000; }
+
+    /* --- Layer menu --- */
+    .layer-wrapper { position: relative; pointer-events: auto; }
+    .layer-menu {
+      display: none; position: absolute;
+      left: 42px; top: 0;
+      background: rgba(255,255,255,0.98);
+      border-radius: 5px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      padding: 10px; min-width: 280px;
+      max-height: 80vh; overflow-y: auto;
+      animation: fadeInName 0.2s;
+    }
+    .layer-menu.active { display: block; }
+    .layer-section { margin-bottom: 12px; }
+    .layer-section-title {
+      font-weight: 700; font-size: 11px; color: #1f4e78;
+      margin-bottom: 6px;
+      border-bottom: 1.5px solid #1f4e78;
+      padding-bottom: 3px;
+      letter-spacing: 0.5px;
+    }
+    .layer-item { display: flex; align-items: center; padding: 5px 0; font-size: 13px; color: #333; cursor: pointer; }
+    .layer-item input { margin-right: 8px; cursor: pointer; }
+
+    /* --- Legend --- */
+    .legend-container {
+      font-size: 11px;
+      max-height: 250px;
+      overflow-y: auto;
+      padding-right: 5px;
+      margin-top: 5px;
+    }
+    .legend-item { display: flex; align-items: center; margin-bottom: 6px; line-height: 1.35; }
+    .legend-color { width: 16px; height: 16px; border: 1px solid #FFFF00; display: inline-block; margin-right: 8px; border-radius: 2px; flex-shrink: 0; }
+
+    /* --- Search --- */
+    .search-wrapper { position: relative; pointer-events: auto; display: flex; align-items: center; }
+    .search-btn-icon { z-index: 2; position: relative; }
+
+    .search-expand-box {
+      position: absolute; left: 18px; top: 0;
+      height: 36px;
+      width: 0;
+      background: white;
+      border-radius: 0 18px 18px 0;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+      display: flex; align-items: center;
+      overflow: hidden; opacity: 0;
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      z-index: 1;
+    }
+    .search-wrapper.active .search-expand-box {
+      width: 260px;
+      left: 30px;
+      opacity: 1;
+      border-radius: 0 6px 6px 0;
+      padding-left: 10px;
+    }
+    .search-wrapper.active .square-btn {
+      border-radius: 6px 0 0 6px;
+      background: #fff;
+      color: #1f4e78;
+    }
+    .search-input { width: 100%; border: none; outline: none; font-size: 14px; background: transparent; padding-right: 10px; }
+
+    .search-results {
+      position: absolute; top: 40px; left: 0;
+      width: 300px; background: white; border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      max-height: 50vh; overflow-y: auto;
+      display: none; z-index: 3000;
+    }
+    .search-item {
+      padding: 10px 15px; border-bottom: 1px solid #f0f0f0;
+      cursor: pointer; font-size: 13px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .search-item:hover { background: #f9f9f9; }
+    .item-main { font-weight: 600; color: #333; font-size: 13px; }
+    .item-sub { font-size: 11px; color: #888; margin-top: 2px; }
+    .item-type {
+      font-size: 10px; padding: 2px 6px; border-radius: 4px;
+      background: #eee; color: #666; white-space: nowrap; margin-left: 8px;
+    }
+
+    /* --- Tools bottom-left --- */
+    .custom-tools { position: absolute; left: 12px; bottom: 40px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+    .tool-btn {
+      width: 36px; height: 36px;
+      border: none;
+      background: rgba(255,255,255,0.9);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: #444;
+      transition: all 0.2s;
+    }
+    .tool-btn.active { background: #3498db; color: white; }
+    .tool-btn.clear { background: #e74c3c; color: white; }
+
+    /* --- Sidebar --- */
+    #sidebar {
+      position: fixed; right: 0; top: 0; bottom: 0;
+      width: 380px; max-width: 92vw;
+      background: #fff;
+      box-shadow: -2px 0 12px rgba(0,0,0,0.18);
+      z-index: 2000;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column;
+    }
+    #sidebar.active { transform: translateX(0); }
+    .sidebar-header {
+      background: linear-gradient(135deg,#1f4e78 0%,#2c3e50 100%);
+      color: #fff;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .close-sidebar { background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 0 5px; }
+    .sidebar-content { flex: 1; overflow-y: auto; padding: 12px 14px; -webkit-overflow-scrolling: touch; }
+
+    /* --- Sub-Tabs for Soil Profile Points (SỐ PD) --- */
+    .pd-tabs-container {
+      margin-bottom: 12px;
+      border-bottom: 2px solid #eef2f5;
+      padding-bottom: 6px;
+    }
+    .pd-tabs-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1f4e78;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pd-tabs-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .pd-tab-btn {
+      padding: 6px 12px;
+      background: #f0f4f8;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .pd-tab-btn:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
+    }
+    .pd-tab-btn.active {
+      background: #1f4e78;
+      color: #ffffff;
+      border-color: #1f4e78;
+      box-shadow: 0 2px 4px rgba(31, 78, 120, 0.3);
+    }
+    .pd-tab-btn .badge-img {
+      background: #e2e8f0;
+      color: #475569;
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 10px;
+    }
+    .pd-tab-btn.active .badge-img {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
+    /* --- Info Tables --- */
+    .info-section-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1f4e78;
+      background: #eef4f8;
+      padding: 6px 10px;
+      border-radius: 4px;
+      margin: 10px 0 6px 0;
+      border-left: 4px solid #1f4e78;
+    }
+
+    .info-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 12px; }
+    .info-table tr { border-bottom: 1px solid #f1f5f9; }
+    .info-table tr:hover { background: #f8fafc; }
+    .info-table td {
+      padding: 8px 10px;
+      vertical-align: top;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .info-table td:first-child {
+      width: 48%;
+      font-weight: 600;
+      color: #475569;
+      background: #f8fafc;
+      border-right: 1px solid #e2e8f0;
+    }
+    .info-table td:last-child { color: #0f172a; }
+
+    /* --- Image Gallery Section --- */
+    .gallery-container {
+      margin-top: 8px;
+      margin-bottom: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .gallery-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1f4e78;
+      margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .gallery-item {
+      position: relative;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      aspect-ratio: 4 / 3;
+      cursor: pointer;
+      background: #f1f5f9;
+    }
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+      display: block;
+    }
+    .gallery-item:hover img {
+      transform: scale(1.05);
+    }
+    .gallery-item-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 18px;
+    }
+    .gallery-item:hover .gallery-item-overlay {
+      opacity: 1;
+    }
+    .cdn-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: #16a34a;
+      color: white;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    /* --- Image Lightbox Modal --- */
+    .lightbox-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 6000;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .lightbox-modal.active { display: flex; }
+    .lightbox-content {
+      max-width: 90vw;
+      max-height: 80vh;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      object-fit: contain;
+    }
+    .lightbox-caption {
+      margin-top: 12px;
+      color: #f8fafc;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 15px; right: 20px;
+      color: white;
+      font-size: 28px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.1);
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    #sidebar-toggle {
+      position: fixed; right: 0; top: 50%;
+      transform: translateY(-50%);
+      z-index: 1999;
+      background: #1f4e78; color: #fff;
+      border: none;
+      width: 24px; height: 50px;
+      cursor: pointer;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.15);
+      border-radius: 6px 0 0 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* --- Loading overlay --- */
+    #loading-overlay {
+      position: fixed; z-index: 5000;
+      left: 0; top: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.9);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: opacity 0.3s;
+    }
+    #loading-overlay.hide { opacity: 0; pointer-events: none; }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1f4e78;
+      border-radius: 50%;
+      width: 30px; height: 30px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #loading-text { font-size: 14px; color: #333; font-weight: 500; }
+
+    /* Custom Leaflet Marker Pulse */
+    .pulsing-pd-marker {
+      background: #ef4444;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+      animation: pulse-ring 1.5s infinite;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .leaflet-control-scale { margin-bottom: 5px !important; margin-left: 10px !important; }
+    @keyframes fadeInName { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <span id="loading-text">Đang khởi tạo hệ thống bản đồ...</span>
+  </div>
+
+  <div class="top-left-controls">
+    <button class="square-btn" id="zoom-in" title="Phóng to"><i class="fas fa-plus"></i></button>
+    <button class="square-btn" id="zoom-out" title="Thu nhỏ"><i class="fas fa-minus"></i></button>
+
+    <div class="layer-wrapper">
+      <button class="square-btn" id="layer-btn" title="Lớp dữ liệu"><i class="fas fa-layer-group"></i></button>
+
+      <div class="layer-menu" id="layer-menu">
+        <div class="layer-section">
+          <div class="layer-section-title">BẢN ĐỒ NỀN</div>
+          <label class="layer-item"><input type="radio" name="basemap" value="satellite">Vệ tinh (Esri)</label>
+          <label class="layer-item"><input type="radio" name="basemap" value="osm" checked>Bản đồ đường (Google Maps)</label>
+        </div>
+
+        <div class="layer-section">
+          <div class="layer-section-title">CHUYÊN ĐỀ</div>
+          <label class="layer-item">
+            <input type="checkbox" id="layer-nhtnancu" checked> Thổ nhưỡng nông hóa An Cư
+          </label>
+          <label class="layer-item">
+            <input type="checkbox" id="layer-pd-points" checked> Điểm đào phẫu diện đất
+          </label>
+        </div>
+
+        <div class="layer-section">
+          <div class="layer-section-title">CHÚ GIẢI THỔ NHƯỠNG (Theo TENDAT.xlsx)</div>
+          <div class="legend-container">
+            <div class="legend-item">
+              <span class="legend-color" style="background:#606060;"></span>
+              <span>XL: Đất xám có tầng loang lổ</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#FFDB70;"></span>
+              <span>Fa: Đất vàng đỏ trên đá macma axit</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#CFCFCF;"></span>
+              <span>X: Đất xám trên phù sa cổ</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#E0E0E0;"></span>
+              <span>B: Đất xám bạc màu trên phù sa cổ</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#9020FF;"></span>
+              <span>Sj2: Đất phèn hoạt động sâu</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#B060FF;"></span>
+              <span>Sp: Đất phèn tiềm tàng</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#CFDCCF;"></span>
+              <span>X/sj: Đất xám trên phù sa cổ trên nền đất phèn hoạt động</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#99CCFF;"></span>
+              <span>Xg: Đất xám gờ lây</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#D0F0FF;"></span>
+              <span>D: Đất thung lũng do sản phẩm dốc tụ</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#6EFF64;"></span>
+              <span>RUNG: Đất lâm nghiệp (Đất rừng)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background:#B4FFFF;"></span>
+              <span>HO: Sông suối, mặt nước chuyên dùng</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="search-wrapper" id="search-wrapper">
+      <button class="square-btn search-btn-icon" id="search-toggle-btn" title="Tìm kiếm"><i class="fas fa-search"></i></button>
+      <div class="search-expand-box">
+        <input type="text" id="search-input" class="search-input" placeholder="Tìm khoanh đất, điểm PD, tọa độ..." autocomplete="off">
+      </div>
+      <div id="search-results" class="search-results"></div>
+    </div>
+  </div>
+
+  <div class="custom-tools">
+    <button class="tool-btn" id="measure-distance" title="Đo khoảng cách"><i class="fas fa-ruler"></i></button>
+    <button class="tool-btn" id="measure-area" title="Đo diện tích"><i class="fas fa-draw-polygon"></i></button>
+    <button class="tool-btn" id="my-location" title="Vị trí của tôi"><i class="fas fa-location-dot"></i></button>
+    <button class="tool-btn clear" id="clear-measures" title="Xóa đo đạc"><i class="fas fa-trash"></i></button>
+  </div>
+
+  <!-- Sidebar Panel -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <span><i class="fas fa-layer-group"></i> Thông tin khoanh đất & phẫu diện</span>
+      <button class="close-sidebar" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="sidebar-content" id="sidebar-content">
+      <div style="padding: 30px 20px; text-align: center; color: #64748b;">
+        <i class="fas fa-map-marked-alt" style="font-size: 36px; color: #1f4e78; margin-bottom: 12px; display:block;"></i>
+        Chạm vào khoanh đất trên bản đồ để xem thông tin thổ nhưỡng nông hóa và hình ảnh phẫu diện thực địa.
+      </div>
+    </div>
+  </div>
+  <button id="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-chevron-left"></i></button>
+
+  <!-- Lightbox Modal for Images -->
+  <div class="lightbox-modal" id="lightbox-modal" onclick="closeLightbox(event)">
+    <div class="lightbox-close" onclick="closeLightbox(event)"><i class="fas fa-times"></i></div>
+    <img class="lightbox-content" id="lightbox-img" src="" alt="Ảnh phẫu diện" referrerpolicy="no-referrer" />
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+  </div>
+
+  <script>
+    let LOCAL_IMAGE_FALLBACK = "../ANHDANGOAI - Copy";
+
+    // Helper to resolve DATA directory path robustly from both root & subfolder locations
+    async function fetchDataFile(filename) {
+      const candidates = [
+        'DATA/' + filename,
+        '../DATA/' + filename,
+        './DATA/' + filename
+      ];
+      for (const path of candidates) {
+        try {
+          const url = path + '?v=' + Date.now();
+          const res = await fetch(url, { cache: 'no-store' });
+          if (res.ok) return res;
+        } catch (e) {}
+      }
+      throw new Error("Không thể tải file dữ liệu: " + filename);
+    }
+
+    // --- 1) MAP INIT ---
+    // Khởi tạo bản đồ zoom thẳng vào xã An Cư, Tịnh Biên, An Giang [10.5483, 105.0165]
+    const map = L.map('map', {
+      zoomControl: false,
+      renderer: L.canvas({ padding: 0.5 })
+    }).setView([10.5483, 105.0165], 13);
+
+    // Bản đồ đường phố: Thay thế OpenStreetMap (bị lỗi 403 Tile Usage Policy) bằng Google Maps Roadmap
+    const osm = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '&copy; Google Maps'
+    }).addTo(map);
+    const esriSatellite = L.tileLayer.provider('Esri.WorldImagery');
+
+    L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+    // Dynamic Label Size scaling on Zoom In / Zoom Out (Keeps labels compact inside polygons when zoomed out)
+    function updateMapLabelSizes() {
+      const zoom = map.getZoom();
+      let parcelFontSize = 8;
+      if (zoom <= 11) parcelFontSize = 5;
+      else if (zoom === 12) parcelFontSize = 6.5;
+      else if (zoom === 13) parcelFontSize = 8;
+      else if (zoom === 14) parcelFontSize = 10;
+      else if (zoom === 15) parcelFontSize = 12.5;
+      else if (zoom === 16) parcelFontSize = 15;
+      else parcelFontSize = 18;
+
+      const pdFontSize = Math.max(3, parcelFontSize / 2);
+
+      document.documentElement.style.setProperty('--parcel-label-size', parcelFontSize + 'px');
+      document.documentElement.style.setProperty('--pd-label-size', pdFontSize + 'px');
+    }
+
+    map.on('zoom zoomend viewreset', updateMapLabelSizes);
+    updateMapLabelSizes();
+
+    // Layer groups for dynamic map labels
+    const parcelLabelsLayerGroup = L.layerGroup().addTo(map);
+    const pdLabelsLayerGroup = L.layerGroup().addTo(map);
+
+    // Soil Colors & Full Exact Descriptions from TENDAT.xlsx
+    const soilColors = {
+      'XL': '#606060', 'Fa': '#FFDB70', 'X': '#CFCFCF', 'B': '#E0E0E0',
+      'Sj2': '#9020FF', 'Sp': '#B060FF', 'X/sj': '#CFDCCF', 'Xg': '#99CCFF',
+      'D': '#D0F0FF', 'RUNG': '#6EFF64', 'HO': '#B4FFFF'
+    };
+
+    const soilDescriptions = {
+      'Sp': 'Đất phèn tiềm tàng (Proto-Thionic Fluvisols)',
+      'Sj2': 'Đất phèn hoạt động sâu (Endo-Thionic Fluvisols)',
+      'Fa': 'Đất vàng đỏ trên đá macma axit (Haplic Acrisols (Skeletic, Episkeletic))',
+      'D': 'Đất thung lũng do sản phẩm dốc tụ (Gleysols (Humic))',
+      'B': 'Đất xám bạc màu trên phù sa cổ (Albic Acrisols)',
+      'X': 'Đất xám trên phù sa cổ (Haplic Acrisols)',
+      'X/sj': 'Đất xám trên phù sa cổ trên nền đất phèn hoạt động (Acrisols (Thionic))',
+      'Xg': 'Đất xám gờ lây (Gleyic Acrisols)',
+      'XL': 'Đất xám có tầng loang lổ (Plinthic Acrisols)',
+      'RUNG': 'Đất lâm nghiệp (Đất rừng)',
+      'HO': 'Sông suối, mặt nước chuyên dùng'
+    };
+
+    function getSoilStyle(feature) {
+      const dat = feature.properties ? feature.properties.DAT : null;
+      const fillColor = soilColors[dat] || '#cccccc';
+      return {
+        fillColor: fillColor,
+        fillOpacity: 0.65,
+        color: '#FFFF00',
+        weight: 1,
+        opacity: 0.9
+      };
+    }
+
+    // Render Parcel Labels using pre-computed Mapbox Polylabel (Pole of Inaccessibility) interior centers for ALL 85 polygon features
+    function buildParcelLabelsFromDb() {
+      parcelLabelsLayerGroup.clearLayers();
+      if (!dbData.parcels) return;
+
+      for (const [khoanhId, p_info] of Object.entries(dbData.parcels)) {
+        const coordsList = p_info.label_coords_list || [];
+        if (coordsList.length > 0) {
+          coordsList.forEach(c => {
+            if (c.lat && c.lng) {
+              const parcelLabelMarker = L.marker([c.lat, c.lng], {
+                icon: L.divIcon({
+                  className: 'parcel-label-icon',
+                  html: `<div class="parcel-map-label">DNH${khoanhId}</div>`,
+                  iconSize: [0, 0],
+                  iconAnchor: [0, 0]
+                }),
+                interactive: false
+              });
+              parcelLabelsLayerGroup.addLayer(parcelLabelMarker);
+            }
+          });
+        } else if (p_info.label_lat && p_info.label_lng) {
+          const parcelLabelMarker = L.marker([p_info.label_lat, p_info.label_lng], {
+            icon: L.divIcon({
+              className: 'parcel-label-icon',
+              html: `<div class="parcel-map-label">DNH${khoanhId}</div>`,
+              iconSize: [0, 0],
+              iconAnchor: [0, 0]
+            }),
+            interactive: false
+          });
+          parcelLabelsLayerGroup.addLayer(parcelLabelMarker);
+        }
+      }
+    }
+
+    // --- 2) DATA STORE & LOADER ---
+    let dbData = { field_configs: [], parcels: {}, profiles: [] };
+    let pdMarkersLayerGroup = L.layerGroup().addTo(map);
+    let pdMarkerMap = {}; // Maps pd_code -> Leaflet Marker
+
+    async function loadJsonDatabase() {
+      try {
+        const res = await fetchDataFile('data_an_cu.json');
+        dbData = await res.json();
+        console.log("Đã tải cơ sở dữ liệu thổ nhưỡng mới nhất:", dbData);
+        buildSoilProfileMarkers();
+        buildParcelLabelsFromDb();
+      } catch (err) {
+        console.error("Lỗi đọc cơ sở dữ liệu:", err);
+      }
+    }
+
+    // Render Soil Profile Point Markers & Labels on Map (Req 5: Nhãn màu đen, không halo, size 1/2 nhãn khoanh)
+    function buildSoilProfileMarkers() {
+      pdMarkersLayerGroup.clearLayers();
+      pdLabelsLayerGroup.clearLayers();
+      pdMarkerMap = {};
+
+      if (!dbData.profiles) return;
+
+      dbData.profiles.forEach(prof => {
+        if (!prof.lat || !prof.lng) return;
+
+        // Circle marker
+        const marker = L.circleMarker([prof.lat, prof.lng], {
+          radius: 5,
+          fillColor: '#0284c7',
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.95
+        });
+
+        marker.bindTooltip(`<b>${prof.so_pd}</b> (Khoanh ${prof.so_khoanh})<br/>Lat: ${prof.lat}, Lng: ${prof.lng}`, { direction: 'top', offset: [0, -5] });
+
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          selectParcelByKhoanh(prof.so_khoanh, prof.so_pd);
+        });
+
+        pdMarkersLayerGroup.addLayer(marker);
+        pdMarkerMap[prof.so_pd] = marker;
+
+        // Requirement 5: Always visible PD Label, 1/2 size of parcel label, Black text, Arial, NO HALO
+        const labelMarker = L.marker([prof.lat, prof.lng], {
+          icon: L.divIcon({
+            className: 'pd-label-icon',
+            html: `<div class="pd-map-label">${prof.so_pd}</div>`,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+          }),
+          interactive: false
+        });
+        pdLabelsLayerGroup.addLayer(labelMarker);
+      });
+    }
+
+    // --- 3) SIDEBAR & PARCEL SELECTION LOGIC ---
+    const sidebar = document.getElementById('sidebar');
+    const sidebarContent = document.getElementById('sidebar-content');
+    const toggleBtn = document.getElementById('sidebar-toggle');
+
+    function toggleSidebar() {
+      sidebar.classList.toggle('active');
+      toggleBtn.querySelector('i').className = sidebar.classList.contains('active')
+        ? 'fas fa-chevron-right'
+        : 'fas fa-chevron-left';
+    }
+    window.toggleSidebar = toggleSidebar;
+
+    let lastHighlightedPolygon = null;
+    let currentPulsingMarker = null;
+
+    function selectParcelByKhoanh(khoanhId, targetPdCode) {
+      const parcel = dbData.parcels[khoanhId];
+      if (!parcel) {
+        alert("Không tìm thấy dữ liệu cho khoanh đất " + khoanhId);
+        return;
+      }
+      renderParcelDetails(parcel, targetPdCode);
+      if (!sidebar.classList.contains('active')) toggleSidebar();
+    }
+
+    function renderParcelDetails(parcel, selectedPdCode) {
+      const profs = parcel.profiles || [];
+      const rows = parcel.rows || [];
+      const count = profs.length;
+      
+      // Default selected profile if not provided
+      if (!selectedPdCode && profs.length > 0) {
+        selectedPdCode = profs[0].so_pd;
+      }
+
+      let html = '';
+
+      // --- SECTION 1: HEADER ---
+      const badgeText = count > 0 ? `${count} điểm phẫu diện` : 'Không có điểm đào';
+      html += `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 700; color: #1f4e78; display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="fas fa-vector-square"></i> Khoanh đất số: ${parcel.so_khoanh}</span>
+            <span style="font-size: 11px; background: ${count > 0 ? '#e0f2fe' : '#f1f5f9'}; color: ${count > 0 ? '#0369a1' : '#64748b'}; padding: 2px 8px; border-radius: 10px; font-weight: 600;">
+              ${badgeText}
+            </span>
+          </div>
+        </div>`;
+
+      // --- CASE A: KHOANH ĐẤT KHÔNG CÓ ĐIỂM ĐÀO PHẪU DIỆN (count === 0) ---
+      if (count === 0) {
+        const rowData = (rows[0] && rows[0].all_fields) ? rows[0].all_fields : {};
+        html += `<div class="info-section-header"><i class="fas fa-file-alt"></i> Thông tin chi tiết khoanh đất</div>`;
+        html += `<table class="info-table">`;
+        
+        dbData.field_configs.forEach(cfg => {
+          let val = rowData[cfg.key];
+          // Req 3: Omit blank fields
+          if (val === undefined || val === null || val === "" || val === "-") return;
+          if (cfg.key === "ĐẤT" && val !== "-") {
+            const desc = soilDescriptions[val];
+            if (desc) val = `<b>${val}</b> (${desc})`;
+          }
+          html += `<tr><td>${cfg.label}</td><td>${val}</td></tr>`;
+        });
+        html += `</table>`;
+
+        html += `
+          <div class="gallery-container">
+            <div class="gallery-title">
+              <span><i class="fas fa-images"></i> Hình ảnh phẫu diện</span>
+            </div>
+            <div style="font-size: 12.5px; color: #64748b; font-style: italic; text-align: center; padding: 15px 10px; background: #f8fafc; border-radius: 6px; border: 1px dashed #cbd5e1;">
+              <i class="fas fa-info-circle" style="color: #0284c7; margin-right: 4px;"></i> Khoanh đất này không có điểm đào phẫu diện thực địa.
+            </div>
+          </div>`;
+
+        sidebarContent.innerHTML = html;
+        return;
+      }
+
+      // --- CASE B: KHOANH ĐẤT CÓ ĐIỂM ĐÀO PHẪU DIỆN (count > 0) ---
+      
+      // 1. HUB OVERVIEW TABLE (General parcel summary info for all parcels with profile points)
+      if (count >= 1) {
+        html += `<div class="info-section-header"><i class="fas fa-list-ul"></i> Thông tin đánh giá tổng quan khoanh đất</div>`;
+        html += `<table class="info-table">`;
+        
+        dbData.field_configs.forEach(cfg => {
+          if (cfg.is_text) {
+            let val = parcel.text_fields[cfg.key];
+            if (val === undefined || val === null || val === "" || val === "-") return;
+            if (cfg.key === "ĐẤT" && val !== "-") {
+              const desc = soilDescriptions[val];
+              if (desc) val = `<b>${val}</b> (${desc})`;
+            }
+            html += `<tr><td>${cfg.label}</td><td>${val}</td></tr>`;
+          }
+        });
+        html += `</table>`;
+      }
+
+      // 2. SUB-TABS FOR SỐ PD ("Chọn điểm phẫu diện (Số PD)")
+      html += `
+        <div class="pd-tabs-container">
+          <div class="pd-tabs-title">
+            <i class="fas fa-map-marker-alt"></i> Chọn Điểm Phẫu Diện (SỐ PD):
+          </div>
+          <div class="pd-tabs-list">`;
+      
+      profs.forEach(p => {
+        const isActive = (p.so_pd === selectedPdCode) ? 'active' : '';
+        const imgCount = (p.imgbb_list && p.imgbb_list.length > 0) ? p.imgbb_list.length : (p.images ? p.images.length : 0);
+        const imgBadge = imgCount > 0 ? `<span class="badge-img"><i class="fas fa-camera"></i> ${imgCount}</span>` : '';
+        html += `
+          <button class="pd-tab-btn ${isActive}" onclick="switchPdTab(${parcel.so_khoanh}, '${p.so_pd}')">
+            ${p.so_pd} ${imgBadge}
+          </button>`;
+      });
+
+      html += `</div></div>`;
+
+      // ACTIVE PROFILE OBJECT
+      const activeProf = profs.find(p => p.so_pd === selectedPdCode) || profs[0];
+
+      if (activeProf) {
+        // REQUIREMENT 1: Hub "Hình ảnh phẫu diện" nằm TRÊN hub "Chi tiết điểm phẫu diện", ngay dưới hub "Chọn điểm phẫu diện (Số PD)"
+        const imgbbItems = activeProf.imgbb_list || [];
+        const localImages = activeProf.images || [];
+
+        html += `
+          <div class="gallery-container">
+            <div class="gallery-title">
+              <span><i class="fas fa-images"></i> Hình ảnh phẫu diện ${activeProf.so_pd} (${imgbbItems.length || localImages.length})</span>
+              <span class="cdn-badge"><i class="fas fa-bolt"></i> ImgBB CDN</span>
+            </div>`;
+
+        if (imgbbItems.length > 0) {
+          html += `<div class="gallery-grid">`;
+          imgbbItems.forEach((item, i) => {
+            const fullUrl = item.url;
+            const thumbUrl = item.thumb || item.url;
+            const localFallbackUrl = (localImages[i]) ? `${LOCAL_IMAGE_FALLBACK}/${activeProf.folder}/${localImages[i]}` : fullUrl;
+            
+            html += `
+              <div class="gallery-item" onclick="openLightbox('${fullUrl}', '${localFallbackUrl}', '${activeProf.so_pd} - Ảnh ${i+1}')">
+                <img src="${thumbUrl}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='${localFallbackUrl}';" alt="${activeProf.so_pd}" />
+                <div class="gallery-item-overlay"><i class="fas fa-search-plus"></i></div>
+              </div>`;
+          });
+          html += `</div>`;
+        } else if (localImages.length > 0) {
+          html += `<div class="gallery-grid">`;
+          localImages.forEach((imgName, i) => {
+            const localUrl = `${LOCAL_IMAGE_FALLBACK}/${activeProf.folder}/${imgName}`;
+            html += `
+              <div class="gallery-item" onclick="openLightbox('${localUrl}', '${localUrl}', '${activeProf.so_pd} - ${imgName}')">
+                <img src="${localUrl}" alt="${imgName}" />
+                <div class="gallery-item-overlay"><i class="fas fa-search-plus"></i></div>
+              </div>`;
+          });
+          html += `</div>`;
+        } else {
+          html += `<div style="font-size: 12px; color: #94a3b8; font-style: italic;">Chưa có hình ảnh thực địa cho phẫu diện này.</div>`;
+        }
+
+        html += `</div>`;
+
+        // 3. HUB "Chi tiết điểm phẫu diện AC - ..." TABLE (REQ 2 & REQ 3)
+        let rowsHtml = '';
+        dbData.field_configs.forEach(cfg => {
+          let val = activeProf.all_fields[cfg.key];
+          
+          // REQ 3: Ô trắng/không có thông tin -> không hiển thị lên (bỏ luôn)
+          if (val === undefined || val === null || val === "" || val === "-") return;
+
+          // REQ 2: Nội dung đã trùng/đã hiển thị ở hub "Thông tin đánh giá tổng quan khoanh đất" -> không hiển thị lại
+          if (count >= 1 && cfg.is_text) {
+            return;
+          }
+
+          if (cfg.key === "ĐẤT" && val !== "-") {
+            const desc = soilDescriptions[val];
+            if (desc) val = `<b>${val}</b> (${desc})`;
+          }
+          rowsHtml += `<tr><td>${cfg.label}</td><td>${val}</td></tr>`;
+        });
+
+        if (rowsHtml !== '') {
+          html += `<div class="info-section-header"><i class="fas fa-microscope"></i> Chi tiết điểm phẫu diện: <b>${activeProf.so_pd}</b></div>`;
+          html += `<table class="info-table">${rowsHtml}</table>`;
+        }
+
+        // Highlight marker on map
+        highlightPdMarkerOnMap(activeProf);
+      }
+
+      sidebarContent.innerHTML = html;
+    }
+
+    // Switch PD Tab
+    window.switchPdTab = function(khoanhId, pdCode) {
+      const parcel = dbData.parcels[khoanhId];
+      if (parcel) {
+        renderParcelDetails(parcel, pdCode);
+      }
+    };
+
+    // Highlight Soil Profile Marker on Map
+    function highlightPdMarkerOnMap(prof) {
+      if (currentPulsingMarker) {
+        map.removeLayer(currentPulsingMarker);
+        currentPulsingMarker = null;
+      }
+
+      const marker = pdMarkerMap[prof.so_pd];
+      if (marker) {
+        const latlng = marker.getLatLng();
+        currentPulsingMarker = L.marker(latlng, {
+          icon: L.divIcon({
+            className: 'pulsing-pd-marker',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+          }),
+          zIndexOffset: 1000
+        }).addTo(map);
+
+        map.panTo(latlng, { animate: true, duration: 0.5 });
+      }
+    }
+
+    // --- 4) LIGHTBOX IMAGE MODAL ---
+    const lightboxModal = document.getElementById('lightbox-modal');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxCaption = document.getElementById('lightbox-caption');
+
+    window.openLightbox = function(primaryUrl, fallbackUrl, caption) {
+      lightboxImg.src = primaryUrl;
+      lightboxImg.onerror = function() {
+        this.onerror = null;
+        this.src = fallbackUrl;
+      };
+      lightboxCaption.innerText = "Ảnh thực địa - Phẫu diện " + caption;
+      lightboxModal.classList.add('active');
+    };
+
+    window.closeLightbox = function(e) {
+      if (e.target === lightboxModal || e.target.classList.contains('lightbox-close') || e.target.parentElement.classList.contains('lightbox-close')) {
+        lightboxModal.classList.remove('active');
+        lightboxImg.src = "";
+      }
+    };
+
+    // --- 5) SEARCH ENGINE ---
+    let searchIndex = [];
+    const searchWrapper = document.getElementById('search-wrapper');
+    const searchToggleBtn = document.getElementById('search-toggle-btn');
+    const searchInput = document.getElementById('search-input');
+    const searchResults = document.getElementById('search-results');
+
+    searchToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      searchWrapper.classList.toggle('active');
+      if (searchWrapper.classList.contains('active')) {
+        searchInput.focus();
+      } else {
+        searchResults.style.display = 'none';
+        searchInput.value = '';
+      }
+    });
+
+    let searchTimeout = null;
+
+    searchInput.addEventListener('input', function(e) {
+      const val = e.target.value.trim();
+      const valLower = val.toLowerCase();
+      
+      if (valLower.length < 1) {
+        searchResults.style.display = 'none';
+        return;
+      }
+
+      let combinedMatches = [];
+
+      // 1. Kiểm tra tọa độ Lat, Long
+      const coordRegex = /^([-+]?\d{1,2}(?:\.\d+)?)(?:,\s*|\s+)([-+]?(?:180(?:(?:\.0+)?)|(?:1[0-7]\d|[1-9]?\d)(?:\.\d+)?))$/;
+      const coordMatch = val.match(coordRegex);
+
+      if (coordMatch) {
+        combinedMatches.push({
+          isMapLocation: true,
+          lat: parseFloat(coordMatch[1]),
+          lng: parseFloat(coordMatch[2]),
+          label: `${coordMatch[1]}, ${coordMatch[2]}`,
+          sub: "Tọa độ Google Maps",
+          type: "Vị trí"
+        });
+      }
+
+      // 2. Search locally in dbData
+      if (dbData.parcels) {
+        for (const [khoanhId, p_info] of Object.entries(dbData.parcels)) {
+          const kStr = `khoanh ${khoanhId} lo ${khoanhId} stt ${khoanhId} dnh${khoanhId} dnh ${khoanhId}`;
+          if (kStr.includes(valLower) || String(khoanhId) === valLower) {
+            combinedMatches.push({
+              isParcel: true,
+              khoanhId: khoanhId,
+              label: `Khoanh đất DNH${khoanhId}`,
+              sub: `${p_info.count > 0 ? p_info.count + ' điểm phẫu diện' : 'Không có điểm đào'} - Loại: ${p_info.text_fields["ĐẤT"] || ''}`,
+              type: "Khoanh đất"
+            });
+          }
+
+          p_info.profiles.forEach(prof => {
+            if (prof.so_pd.toLowerCase().includes(valLower)) {
+              combinedMatches.push({
+                isProfile: true,
+                khoanhId: khoanhId,
+                pdCode: prof.so_pd,
+                lat: prof.lat,
+                lng: prof.lng,
+                label: `Phẫu diện: ${prof.so_pd}`,
+                sub: `Thuộc khoanh đất DNH${khoanhId}`,
+                type: "Điểm PD"
+              });
+            }
+          });
+        }
+      }
+
+      // Render search UI
+      const renderSearchUI = (matches) => {
+        if (matches.length > 0) {
+          let html = '';
+          matches.slice(0, 12).forEach((item, index) => {
+            html += `<div class="search-item" onclick="zoomToResult(${index})">
+                      <div>
+                        <div class="item-main">${item.label}</div>
+                        <div class="item-sub">${item.sub}</div>
+                      </div>
+                      <div class="item-type">${item.type}</div>
+                    </div>`;
+          });
+          searchResults.tempMatches = matches;
+          searchResults.innerHTML = html;
+          searchResults.style.display = 'block';
+        } else {
+          searchResults.innerHTML = '<div class="search-item" style="color:#999; justify-content:center;">Không tìm thấy kết quả</div>';
+          searchResults.style.display = 'block';
+        }
+      };
+
+      renderSearchUI(combinedMatches);
+    });
+
+    let tempSearchMarker = null;
+
+    window.zoomToResult = function(index) {
+      const matches = searchResults.tempMatches;
+      if (matches && matches[index]) {
+        const item = matches[index];
+
+        if (tempSearchMarker) {
+          map.removeLayer(tempSearchMarker);
+          tempSearchMarker = null;
+        }
+
+        if (item.isMapLocation) {
+          const latlng = [item.lat, item.lng];
+          map.setView(latlng, 15);
+          tempSearchMarker = L.marker(latlng).addTo(map)
+            .bindPopup(`<b>${item.label}</b><br/>${item.sub}`)
+            .openPopup();
+          
+          setTimeout(() => {
+            if (tempSearchMarker) map.removeLayer(tempSearchMarker);
+          }, 5000);
+        } else if (item.isParcel) {
+          selectParcelByKhoanh(item.khoanhId);
+        } else if (item.isProfile) {
+          selectParcelByKhoanh(item.khoanhId, item.pdCode);
+        }
+
+        searchInput.value = item.label;
+        searchResults.style.display = 'none';
+      }
+    };
+
+    // --- 6) UI CONTROLS & LAYERS ---
+    const layerBtn = document.getElementById('layer-btn');
+    const layerMenu = document.getElementById('layer-menu');
+
+    layerBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      layerMenu.classList.toggle('active');
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!searchWrapper.contains(e.target)) {
+        searchWrapper.classList.remove('active');
+        searchResults.style.display = 'none';
+      }
+      if (!layerMenu.contains(e.target) && !layerBtn.contains(e.target)) {
+        layerMenu.classList.remove('active');
+      }
+    });
+
+    function setLoading(isLoading, text) {
+      const el = document.getElementById('loading-overlay');
+      const t = document.getElementById('loading-text');
+      if (isLoading) {
+        el.classList.remove('hide');
+        t.innerText = text || "Đang tải...";
+      } else {
+        el.classList.add('hide');
+      }
+    }
+
+    map.on('click', () => {
+      if (lastHighlightedPolygon && lastHighlightedPolygon.ref && lastHighlightedPolygon.ref.setStyle) {
+        lastHighlightedPolygon.ref.setStyle(lastHighlightedPolygon.style);
+        lastHighlightedPolygon = null;
+      }
+      if (currentPulsingMarker) {
+        map.removeLayer(currentPulsingMarker);
+        currentPulsingMarker = null;
+      }
+      if (sidebar.classList.contains('active')) toggleSidebar();
+    });
+
+    const loadedLayers = {};
+
+    async function toggleLayer(id) {
+      const checkbox = document.getElementById(id);
+      
+      if (id === 'layer-pd-points') {
+        if (checkbox.checked) {
+          map.addLayer(pdMarkersLayerGroup);
+          map.addLayer(pdLabelsLayerGroup);
+        } else {
+          map.removeLayer(pdMarkersLayerGroup);
+          map.removeLayer(pdLabelsLayerGroup);
+        }
+        return;
+      }
+
+      if (!checkbox.checked) {
+        if (loadedLayers[id]) map.removeLayer(loadedLayers[id]);
+        map.removeLayer(parcelLabelsLayerGroup);
+        return;
+      }
+      if (loadedLayers[id]) {
+        map.addLayer(loadedLayers[id]);
+        map.addLayer(parcelLabelsLayerGroup);
+        buildParcelLabelsFromDb();
+        return;
+      }
+
+      try {
+        setLoading(true, "Đang tải dữ liệu thổ nhưỡng An Cư...");
+        const response = await fetchDataFile('NHTNAnCu.zip');
+        const buffer = await response.arrayBuffer();
+        const geojson = await shp.parseZip(buffer);
+
+        const layer = L.geoJSON(geojson, {
+          style: getSoilStyle,
+          onEachFeature: function(feature, lyr) {
+            const khoanhId = feature.properties ? feature.properties.STT : null;
+
+            lyr.on('click', (e) => {
+              L.DomEvent.stopPropagation(e);
+              const style = getSoilStyle(feature);
+
+              if (lastHighlightedPolygon && lastHighlightedPolygon.ref) {
+                lastHighlightedPolygon.ref.setStyle(lastHighlightedPolygon.style);
+              }
+              lyr.setStyle({ weight: 3, color: '#ff0000', fillOpacity: 0.75 });
+              lastHighlightedPolygon = { ref: lyr, style: style };
+
+              selectParcelByKhoanh(khoanhId);
+            });
+          }
+        });
+
+        loadedLayers[id] = layer;
+        map.addLayer(layer);
+        map.addLayer(parcelLabelsLayerGroup);
+        buildParcelLabelsFromDb();
+      } catch (err) {
+        console.error(err);
+        alert("Lỗi tải lớp dữ liệu: " + err.message);
+        checkbox.checked = false;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    document.getElementById('layer-nhtnancu').addEventListener('change', () => toggleLayer('layer-nhtnancu'));
+    document.getElementById('layer-pd-points').addEventListener('change', () => toggleLayer('layer-pd-points'));
+
+    // --- 7) MEASUREMENT TOOLS ---
+    document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
+    document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
+
+    document.querySelectorAll('input[name="basemap"]').forEach(i => i.addEventListener('change', (e) => {
+      if (e.target.value === 'satellite') {
+        map.removeLayer(osm);
+        map.addLayer(esriSatellite);
+      } else {
+        map.removeLayer(esriSatellite);
+        map.addLayer(osm);
+      }
+    }));
+
+    const drawnItems = new L.FeatureGroup().addTo(map);
+    let measureMode = null;
+
+    const clearBtn = document.getElementById('clear-measures');
+    const distBtn = document.getElementById('measure-distance');
+    const areaBtn = document.getElementById('measure-area');
+
+    distBtn.addEventListener('click', function() {
+      if (measureMode) return;
+      measureMode = 'dist';
+      this.classList.add('active');
+      new L.Draw.Polyline(map, { shapeOptions: { color: 'red', weight: 3 } }).enable();
+    });
+
+    areaBtn.addEventListener('click', function() {
+      if (measureMode) return;
+      measureMode = 'area';
+      this.classList.add('active');
+      new L.Draw.Polygon(map, { shapeOptions: { color: 'blue', weight: 2, fillColor: 'blue', fillOpacity: 0.15 } }).enable();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      drawnItems.clearLayers();
+      distBtn.classList.remove('active');
+      areaBtn.classList.remove('active');
+      measureMode = null;
+    });
+
+    map.on(L.Draw.Event.CREATED, (e) => {
+      drawnItems.addLayer(e.layer);
+
+      let content = "";
+      if (e.layerType === 'polyline') {
+        let dist = 0;
+        const latlngs = e.layer.getLatLngs();
+        for (let i = 0; i < latlngs.length - 1; i++) {
+          dist += latlngs[i].distanceTo(latlngs[i + 1]);
+        }
+        content = dist > 1000 ? (dist / 1000).toFixed(2) + " km" : Math.round(dist) + " m";
+      } else {
+        const area = L.GeometryUtil.geodesicArea(e.layer.getLatLngs()[0]);
+        content = area > 10000 ? (area / 10000).toFixed(2) + " ha" : Math.round(area) + " m²";
+      }
+
+      e.layer.bindPopup("<b>Đo đạc:</b> " + content).openPopup();
+      distBtn.classList.remove('active');
+      areaBtn.classList.remove('active');
+      measureMode = null;
+    });
+
+    document.getElementById('my-location').addEventListener('click', () => map.locate({ setView: true, maxZoom: 16 }));
+    map.on('locationfound', (e) => {
+      L.circle(e.latlng, { radius: e.accuracy / 2, color: 'blue', fillColor: '#3498db', fillOpacity: 0.2 }).addTo(map);
+      L.circleMarker(e.latlng, { radius: 5, color: 'white', fillColor: 'blue', fillOpacity: 1 }).addTo(map)
+        .bindPopup("Vị trí hiện tại của bạn").openPopup();
+    });
+
+    // --- 8) INITIALIZATION ---
+    (async function init() {
+      try {
+        setLoading(true, "Đang tải dữ liệu thổ nhưỡng...");
+        await loadJsonDatabase();
+        if (document.getElementById('layer-nhtnancu').checked) {
+          await toggleLayer('layer-nhtnancu');
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  </script>
+</body>
+</html>
